@@ -1,0 +1,7 @@
+psycopg2-binary==2.9.9
+spacy==3.7.2
+python-dateutil==2.8.2
+regex==2023.10.3
+
+# After installing requirements, download spaCy model:
+# python -m spacy download en_core_web_sm
