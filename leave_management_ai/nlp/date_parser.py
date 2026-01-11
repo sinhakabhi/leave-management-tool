@@ -50,16 +50,8 @@ class DateParser:
             if day_name in text:
                 return self._get_next_weekday(day_num)
         
-        # Try parsing with dateutil
-        try:
-            parsed = dateutil_parser.parse(text, fuzzy=True, default=datetime.now())
-            return parsed.date()
-        except:
-            pass
-        
-        # Try common formats with regex
-        # Format: DD/MM/YYYY or DD-MM-YYYY
-        match = re.search(r'(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})', text)
+        # Format: DD-MM-YYYY or DD/MM/YYYY (13-01-2026 or 13/01/2026)
+        match = re.search(r'(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})', text)
         if match:
             day, month, year = match.groups()
             year = int(year)
@@ -70,21 +62,29 @@ class DateParser:
             except:
                 pass
         
-        # Format: DD Month or DDth Month
-        match = re.search(r'(\d{1,2})(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)', text)
+        # Format: DD Month YYYY or DDth Month YYYY (13 Jan 2026 or 13th Jan 2026)
+        match = re.search(r'(\d{1,2})(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(?:\s+(\d{4}))?', text)
         if match:
             day = int(match.group(1))
             month_str = match.group(3)
-            year = self.today.year
+            year_str = match.group(4)
+            year = int(year_str) if year_str else self.today.year
             try:
                 parsed = dateutil_parser.parse(f"{day} {month_str} {year}")
                 result_date = parsed.date()
-                # If date is in the past, assume next year
-                if result_date < self.today:
+                # If date is in the past and no year specified, assume next year
+                if not year_str and result_date < self.today:
                     result_date = result_date.replace(year=year + 1)
                 return result_date
             except:
                 pass
+        
+        # Try parsing with dateutil (catches many formats)
+        try:
+            parsed = dateutil_parser.parse(text, fuzzy=True, default=datetime.now())
+            return parsed.date()
+        except:
+            pass
         
         return None
     
@@ -95,7 +95,31 @@ class DateParser:
         """
         text = text.lower()
         
-        # Pattern: "from X to Y" or "X to Y"
+        # Pattern 1: "X and Y" (Monday and Tuesday, 20th and 21st)
+        and_pattern = r'(?:on\s+)?(.+?)\s+and\s+(.+?)(?:\s+|$|,|\.|\band\b)'
+        match = re.search(and_pattern, text)
+        if match:
+            first_text, second_text = match.groups()
+            # Clean up the texts
+            first_text = first_text.strip()
+            second_text = second_text.strip()
+            
+            # Remove common words that might interfere
+            for word in ['leave', 'on', 'apply', 'want', 'need', 'request']:
+                first_text = first_text.replace(word, '').strip()
+                second_text = second_text.replace(word, '').strip()
+            
+            first_date = self.parse_single_date(first_text)
+            second_date = self.parse_single_date(second_text)
+            
+            if first_date and second_date:
+                # Return them in chronological order
+                if first_date <= second_date:
+                    return first_date, second_date
+                else:
+                    return second_date, first_date
+        
+        # Pattern 2: "from X to Y" or "X to Y"
         from_to_pattern = r'(?:from\s+)?(.+?)\s+(?:to|until|till|-)\s+(.+?)(?:\s|$|,|\.)'
         match = re.search(from_to_pattern, text)
         if match:
@@ -105,20 +129,26 @@ class DateParser:
             if start_date and end_date:
                 return start_date, end_date
         
-        # Pattern: "on DATE" (single day)
+        # Pattern 3: "on DATE" (single day)
         on_pattern = r'on\s+(.+?)(?:\s|$|,|\.)'
         match = re.search(on_pattern, text)
         if match:
-            date = self.parse_single_date(match.group(1))
-            if date:
-                return date, date
+            date_text = match.group(1)
+            # Make sure it's not part of an "and" pattern
+            if ' and ' not in date_text:
+                date = self.parse_single_date(date_text)
+                if date:
+                    return date, date
         
-        # Try to find two dates in the text
+        # Pattern 4: Try to find two dates in the text
         dates = []
         words = text.split()
         for i in range(len(words)):
             for j in range(i+1, min(i+6, len(words)+1)):
                 phrase = ' '.join(words[i:j])
+                # Skip if it contains 'and' (already handled above)
+                if ' and ' in phrase:
+                    continue
                 date = self.parse_single_date(phrase)
                 if date and date not in dates:
                     dates.append(date)

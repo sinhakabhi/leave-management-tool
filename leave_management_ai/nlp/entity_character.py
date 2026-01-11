@@ -3,6 +3,7 @@ Entity extraction from user text
 """
 import re
 import spacy
+from leave_management_ai.config.settings import BUSINESS_RULES
 from leave_management_ai.nlp.date_parser import DateParser
 
 
@@ -64,7 +65,6 @@ class EntityExtractor:
         
         if start_date and end_date:
             # Calculate days based on configuration
-            from config.settings import BUSINESS_RULES
             days_count = self.date_parser.calculate_business_days(
                 start_date, 
                 end_date,

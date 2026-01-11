@@ -61,29 +61,29 @@ def insert_sample_data():
     leave_balances = [
         # EMP101
         ('EMP101', 'casual', 12),
-        ('EMP101', 'sick', 8),
+        ('EMP101', 'sick', 12),
         ('EMP101', 'vacation', 15),
-        ('EMP101', 'general', 20),
+        ('EMP101', 'general', 10),
         # EMP102
-        ('EMP102', 'casual', 10),
-        ('EMP102', 'sick', 10),
-        ('EMP102', 'vacation', 12),
-        ('EMP102', 'general', 18),
+        ('EMP102', 'casual', 12),
+        ('EMP102', 'sick', 12),
+        ('EMP102', 'vacation', 15),
+        ('EMP102', 'general', 10),
         # EMP103
-        ('EMP103', 'casual', 8),
-        ('EMP103', 'sick', 6),
-        ('EMP103', 'vacation', 10),
-        ('EMP103', 'general', 15),
+        ('EMP103', 'casual', 12),
+        ('EMP103', 'sick', 12),
+        ('EMP103', 'vacation', 15),
+        ('EMP103', 'general', 10),
         # EMP104
-        ('EMP104', 'casual', 15),
+        ('EMP104', 'casual', 12),
         ('EMP104', 'sick', 12),
-        ('EMP104', 'vacation', 20),
-        ('EMP104', 'general', 25),
+        ('EMP104', 'vacation', 15),
+        ('EMP104', 'general', 10),
         # EMP105
-        ('EMP105', 'casual', 11),
-        ('EMP105', 'sick', 9),
-        ('EMP105', 'vacation', 14),
-        ('EMP105', 'general', 22),
+        ('EMP105', 'casual', 12),
+        ('EMP105', 'sick', 12),
+        ('EMP105', 'vacation', 15),
+        ('EMP105', 'general', 10),
     ]
     
     for balance in leave_balances:

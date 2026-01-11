@@ -58,8 +58,10 @@ class ResponseGenerator:
         return (
             "I'm not sure I understood that. I can help you with:\n\n"
             "  • Applying for leave (e.g., 'I need leave from 20th to 25th')\n"
-            "  • Checking your leave balance (e.g., 'What's my balance?')\n"
-            "  • Viewing leave history (e.g., 'Show my leave history')\n\n"
+            "  • Checking eligibility (e.g., 'Can I take leave tomorrow?')\n"
+            "  • Checking balance (e.g., 'What's my balance?')\n"
+            "  • Viewing history (e.g., 'Show my leave history')\n"
+            "  • Cancelling future leaves (e.g., 'Cancel my leave on 20th')\n\n"
             "What would you like to do?"
         )
     
@@ -72,3 +74,60 @@ class ResponseGenerator:
     def generate_no_pending_response():
         """Generate response when no pending request exists"""
         return "There is no pending leave request to confirm. Please create a new leave request first."
+    
+    @staticmethod
+    def generate_eligibility_yes_response(eligibility_data):
+        """Generate positive eligibility response"""
+        return RESPONSE_TEMPLATES['eligibility_yes'].format(**eligibility_data)
+    
+    @staticmethod
+    def generate_eligibility_no_weekend_response(eligibility_data):
+        """Generate weekend eligibility response"""
+        return RESPONSE_TEMPLATES['eligibility_no_weekend'].format(**eligibility_data)
+    
+    @staticmethod
+    def generate_eligibility_no_balance_response(eligibility_data):
+        """Generate insufficient balance eligibility response"""
+        return RESPONSE_TEMPLATES['eligibility_no_balance'].format(**eligibility_data)
+    
+    @staticmethod
+    def generate_overlapping_leaves_response(overlap_data):
+        """Generate response for overlapping leaves"""
+        overlap_details = []
+        for i, leave in enumerate(overlap_data['overlapping_leaves'], 1):
+            overlap_details.append(
+                f"{i}. {leave['leave_type']}\n"
+                f"   📅 {leave['start_date']} → {leave['end_date']} ({leave['days']} days)"
+            )
+        
+        return RESPONSE_TEMPLATES['overlapping_leaves'].format(
+            overlap_details='\n'.join(overlap_details),
+            start_date=overlap_data['overlapping_leaves'][0]['start_date'],
+            end_date=overlap_data['overlapping_leaves'][-1]['end_date']
+        )
+    
+    @staticmethod
+    def generate_leaves_cancelled_response(cancel_data):
+        """Generate response for cancelled leaves"""
+        cancelled_details = []
+        for i, leave in enumerate(cancel_data['cancelled_leaves'], 1):
+            cancelled_details.append(
+                f"{i}. {leave['leave_type']}\n"
+                f"   📅 {leave['start_date']} → {leave['end_date']}\n"
+                f"   ↩️  Restored: {leave['days']} days → Balance: {leave['restored_balance']} days"
+            )
+        
+        return RESPONSE_TEMPLATES['leaves_cancelled'].format(
+            cancelled_details='\n'.join(cancelled_details),
+            total_restored=cancel_data['total_restored']
+        )
+    
+    @staticmethod
+    def generate_cancel_past_leave_error():
+        """Generate error for trying to cancel past leave"""
+        return RESPONSE_TEMPLATES['cancel_past_leave_error']
+    
+    @staticmethod
+    def generate_no_leaves_to_cancel():
+        """Generate response when no leaves found to cancel"""
+        return RESPONSE_TEMPLATES['no_leaves_to_cancel']

@@ -101,6 +101,73 @@ class LeaveRequestOperations:
         """
         results = execute_query(query, (employee_id, limit), fetch=True)
         return results
+    
+    @staticmethod
+    def check_overlapping_leaves(employee_id, start_date, end_date):
+        """Check if there are existing approved leaves overlapping with the date range"""
+        query = """
+        SELECT id, leave_type, start_date, end_date, days_count
+        FROM leave_requests
+        WHERE employee_id = %s 
+        AND status = 'approved'
+        AND (
+            (start_date <= %s AND end_date >= %s) OR
+            (start_date <= %s AND end_date >= %s) OR
+            (start_date >= %s AND end_date <= %s)
+        );
+        """
+        results = execute_query(query, (employee_id, end_date, end_date, start_date, start_date, start_date, end_date), fetch=True)
+        return results
+    
+    @staticmethod
+    def get_future_leaves(employee_id, from_date):
+        """Get future approved leaves after a specific date"""
+        query = """
+        SELECT id, leave_type, start_date, end_date, days_count, requested_at
+        FROM leave_requests
+        WHERE employee_id = %s 
+        AND status = 'approved'
+        AND start_date > %s
+        ORDER BY start_date ASC;
+        """
+        results = execute_query(query, (employee_id, from_date), fetch=True)
+        return results
+    
+    @staticmethod
+    def get_leaves_in_range(employee_id, start_date, end_date):
+        """Get approved leaves in a specific date range"""
+        query = """
+        SELECT id, leave_type, start_date, end_date, days_count
+        FROM leave_requests
+        WHERE employee_id = %s 
+        AND status = 'approved'
+        AND start_date >= %s 
+        AND end_date <= %s
+        ORDER BY start_date ASC;
+        """
+        results = execute_query(query, (employee_id, start_date, end_date), fetch=True)
+        return results
+    
+    @staticmethod
+    def cancel_leave_request(request_id):
+        """Cancel an approved leave request"""
+        query = """
+        UPDATE leave_requests 
+        SET status = 'cancelled'
+        WHERE id = %s AND status = 'approved'
+        RETURNING id, employee_id, leave_type, start_date, end_date, days_count;
+        """
+        db = DatabaseConnection()
+        conn = db.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, (request_id,))
+            result = cursor.fetchone()
+            conn.commit()
+            cursor.close()
+            return result
+        finally:
+            db.return_connection(conn)
 
 
 class LeaveTransactionOperations:
