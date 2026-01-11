@@ -1,6 +1,7 @@
 """
 Main application - Leave Management AI
 """
+from leave_management_ai.config.settings import LEAVE_TYPES
 from leave_management_ai.nlp.entity_character import EntityExtractor
 from leave_management_ai.nlp.intent_classifier import IntentClassifier
 from services.leave_service import LeaveService
@@ -67,6 +68,12 @@ class LeaveManagementAI:
             elif intent == 'leave_history':
                 return self._handle_leave_history(entities)
             
+            elif intent == 'check_eligibility':
+                return self._handle_eligibility_check(entities)
+            
+            elif intent == 'cancel_approved_leave':
+                return self._handle_cancel_approved_leave(entities)
+            
             else:
                 return self.response_generator.generate_out_of_scope_response()
         
@@ -89,7 +96,7 @@ class LeaveManagementAI:
                 "Examples: 'leave from tomorrow to Friday' or 'leave on 20th Jan'"
             )
         
-        # Create leave request
+        # Create leave request (this now checks for overlaps)
         request_data = self.leave_service.create_leave_request(
             employee_id,
             entities['leave_type'],
@@ -97,6 +104,10 @@ class LeaveManagementAI:
             entities['end_date'],
             entities['days_count']
         )
+        
+        # Check if there's an overlap
+        if request_data.get('has_overlap'):
+            return self.response_generator.generate_overlapping_leaves_response(request_data)
         
         return self.response_generator.generate_leave_request_response(request_data)
     
@@ -167,6 +178,91 @@ class LeaveManagementAI:
         # Get history
         history_data = self.leave_service.get_leave_history(employee_id)
         return self.response_generator.generate_history_response(history_data)
+    
+    def _handle_eligibility_check(self, entities):
+        """Handle eligibility check request (can I take leave?)"""
+        employee_id = entities['employee_id']
+        
+        # Validate employee
+        is_valid, result = self.leave_service.validate_employee(employee_id)
+        if not is_valid:
+            return self.response_generator.generate_error_response(result)
+        
+        # If no dates specified, assume "today"
+        if not entities['start_date']:
+            from datetime import datetime
+            target_date = datetime.now().date()
+        else:
+            target_date = entities['start_date']
+        
+        # Check eligibility for the date
+        is_eligible, reason_data = self.leave_service.check_leave_eligibility_for_date(
+            employee_id,
+            entities['leave_type'],
+            target_date,
+            days_requested=1
+        )
+        
+        # Generate appropriate response
+        if is_eligible:
+            return self.response_generator.generate_eligibility_yes_response(reason_data)
+        elif reason_data['type'] == 'weekend':
+            return self.response_generator.generate_eligibility_no_weekend_response(reason_data)
+        else:  # no_balance
+            return self.response_generator.generate_eligibility_no_balance_response(reason_data)
+    
+    def _handle_cancel_approved_leave(self, entities):
+        """Handle cancellation of approved leaves"""
+        employee_id = entities['employee_id']
+        
+        # Validate employee
+        is_valid, result = self.leave_service.validate_employee(employee_id)
+        if not is_valid:
+            return self.response_generator.generate_error_response(result)
+        
+        # If no dates specified, show future leaves and ask which to cancel
+        if not entities['start_date']:
+            from datetime import datetime
+            future_leaves = self.leave_service.request_ops.get_future_leaves(
+                employee_id, datetime.now().date()
+            )
+            
+            if not future_leaves:
+                return "You don't have any future approved leaves to cancel."
+            
+            # Format future leaves for display
+            response = "Your future approved leaves:\n\n"
+            for i, leave in enumerate(future_leaves, 1):
+                leave_id, leave_type, start, end, days, requested = leave
+                response += (
+                    f"{i}. {LEAVE_TYPES.get(leave_type, leave_type)}\n"
+                    f"   📅 {start.strftime('%Y-%m-%d')} → {end.strftime('%Y-%m-%d')} ({days} days)\n\n"
+                )
+            
+            response += "To cancel, specify the dates:\n"
+            response += "Example: 'cancel my leave from [start] to [end]'"
+            return response
+        
+        # If single date, set end_date = start_date
+        if not entities['end_date']:
+            entities['end_date'] = entities['start_date']
+        
+        # Cancel approved leaves
+        success, result_data = self.leave_service.cancel_approved_leaves(
+            employee_id,
+            entities['start_date'],
+            entities['end_date']
+        )
+        
+        if success:
+            return self.response_generator.generate_leaves_cancelled_response(result_data)
+        else:
+            if result_data.get('error') == 'past_leave':
+                return self.response_generator.generate_cancel_past_leave_error()
+            elif result_data.get('error') == 'no_leaves':
+                return self.response_generator.generate_no_leaves_to_cancel()
+            else:
+                return self.response_generator.generate_error_response(result_data.get('message', 'Failed to cancel leave'))
 
 
 def main():
